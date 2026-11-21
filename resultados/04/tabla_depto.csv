@@ -1,0 +1,7 @@
+,F1 macro,F1 cultivos,MAE por depto (kg/ha)
+Referencia,,,756 ± 140
+Clima + cultivo real (RF),,,520 ± 108
+Random Forest,0.934 ± 0.008,0.937 ± 0.012,724 ± 111
+Random Forest + clima,0.936 ± 0.012,0.939 ± 0.014,614 ± 131
+CNN + LSTM,0.947 ± 0.004,0.952 ± 0.004,747 ± 78
+CNN + LSTM + clima,0.947 ± 0.006,0.953 ± 0.008,681 ± 109

@@ -1,0 +1,22 @@
+# Versiones con las que se corrieron los notebooks en Google Colab (noviembre de 2026; ver resultados/05/versiones.json)
+tensorflow==2.21.0
+keras==3.13.2
+numpy==2.4.6
+pandas==2.2.3
+scikit-learn
+matplotlib
+rasterio          # notebook 01
+pyproj            # notebook 01
+earthengine-api   # notebook 02
+
+# Notebook 06: conversión a ONNX (probado con tf2onnx 1.17.0, onnx 1.23.2 y onnxruntime 1.29.0)
+tf2onnx
+onnx
+onnxruntime
+
+# API (app/): probada con fastapi 0.165.0, pydantic 2.13.5 y uvicorn 0.54.0
+fastapi
+uvicorn
+python-multipart
+pytest
+httpx

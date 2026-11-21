@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<title>La red en enero contra el mapa del INTA</title>
+<link rel="stylesheet" href="static/vendor/leaflet/leaflet.css">
+<link rel="stylesheet" href="static/style.css">
+</head>
+<body>
+<header>
+  <div class="titulo">
+    <p class="antetitulo">Trabajo final · IA y Aprendizaje Automático II · UCA Rosario 2026</p>
+    <h1>La red en enero contra el mapa del INTA</h1>
+    <p class="mensaje">Una red CNN + LSTM que mira imágenes Sentinel-2 <strong>solo hasta enero</strong> reconoce el cultivo
+      de puntos de muestra en lotes puros, en una campaña que no vio. El mapa del INTA con el que se compara se publica unos 10 meses después de enero.</p>
+  </div>
+  <nav aria-label="Secciones" role="tablist">
+    <button class="pestana activa" role="tab" aria-selected="true" data-pestana="mapa">Mapa</button>
+    <button class="pestana" role="tab" aria-selected="false" data-pestana="modelo">El modelo</button>
+    <button class="pestana" role="tab" aria-selected="false" data-pestana="api">Probá la API</button>
+  </nav>
+</header>
+
+
+
+<main>
+  <!-- ======================= MAPA ======================= -->
+  <section id="pestana-mapa" class="panel-pestana activa">
+    <div class="controles">
+      <label>Campaña <select id="sel-campana"></select></label>
+      <div class="grupo-botones" role="radiogroup" aria-label="Qué se muestra">
+        <button data-vista="red" class="activo" aria-pressed="true" id="btn-vista-red">Red en enero</button>
+        <button data-vista="inta" aria-pressed="false" title="Se publica unos 10 meses después de enero">Mapa del INTA</button>
+        <button data-vista="errores" aria-pressed="false">Solo errores</button>
+        <button data-vista="dudosos" aria-pressed="false">Dudosos</button>
+        <button data-vista="vivo" aria-pressed="false" class="solo-vivo" title="Puntos con su serie de imágenes publicada: se puede correr el modelo en vivo">Correr en vivo</button>
+      </div>
+      <div class="grupo-botones chico" role="radiogroup" aria-label="Predicción de la red">
+        <span class="etiqueta">Predicción de la red:</span>
+        <button data-modo="enero" class="activo" aria-pressed="true">hasta enero</button>
+        <button data-modo="completa" aria-pressed="false">campaña completa</button>
+      </div>
+    </div>
+
+    <p class="aviso-corto">Puntos de muestra en zonas puras, balanceados por clase · cada campaña con el modelo que no la vio ·
+      <a href="#aclaraciones">aclaraciones</a></p>
+    <div class="resumen" id="resumen"></div>
+
+    <div class="mapa-y-inspector">
+      <div class="mapa-caja">
+        <div id="mapa"></div>
+        <div class="leyenda" id="leyenda"></div>
+      </div>
+      <aside id="inspector" class="inspector vacio">
+        <p class="ayuda">Hacé clic en un punto del mapa para ver su curva de verdor, qué dijo la red y el rinde de su departamento.</p>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ======================= MODELO ======================= -->
+  <section id="pestana-modelo" class="panel-pestana">
+    <div class="ficha">
+      <article>
+        <h2>Qué hace</h2>
+        <p>A partir de la serie de imágenes de un parche de 160 × 160 m a lo largo de la campaña, clasifica el cultivo
+          (maíz, soja de primera, soja de segunda u otros) y estima el rinde del departamento.</p>
+        <h3>Datos</h3>
+        <ul>
+          <li><strong>Etiquetas:</strong> Mapa Nacional de Cultivos del INTA, 6 campañas (2019/20 a 2024/25). Soja de 1ra y de 2da se separan cruzando el mapa de verano con el de invierno.</li>
+          <li><strong>Imágenes:</strong> Sentinel-2 nivel 2A, 27 períodos de 10 días (septiembre a mayo), 10 bandas más NDVI y NDRE, nubes enmascaradas con Cloud Score+.</li>
+          <li><strong>Rinde:</strong> estimaciones agrícolas del MAGyP, por departamento, sobre superficie sembrada.</li>
+        </ul>
+        <h3>Arquitectura</h3>
+        <p>Una CNN aplicada a cada fecha (TimeDistributed) resume cada imagen en 64 valores; una LSTM recorre la
+          secuencia; dos salidas: el cultivo (4 clases) y el rinde. La versión “hasta enero” ve solo los primeros 15 períodos.</p>
+        <h3>Evaluación</h3>
+        <p><strong>Dejando un año afuera:</strong> cada campaña se predice con un modelo entrenado con las otras cinco. Es
+          la prueba más parecida al uso real, predecir una campaña nueva.</p>
+      </article>
+      <article>
+        <h2>Métricas por campaña</h2>
+        <div id="tabla-metricas"></div>
+        <p class="nota" id="aclaracion-metricas"></p>
+      </article>
+      <article>
+        <h2>Limitaciones</h2>
+        <ul>
+          <li>Puntos en zonas puras de unas 10 ha: no evalúa bordes de lote ni lotes mezclados.</li>
+          <li>La muestra está balanceada: no sirve para estimar superficie.</li>
+          <li>Se mide contra el mapa del INTA, que tiene sus propios errores (más en la sequía de 2022/23).</li>
+          <li>El rinde es por departamento: para un lote, la estimación es en la práctica el rinde típico de su zona.</li>
+          <li>La sequía de 2022/23 es el año en que más falla.</li>
+          <li id="lim-desacuerdo">Una parte de los puntos no coincide con el INTA (ver la tabla de métricas).</li>
+          <li id="lim-dudosos">Cuando la red duda, se equivoca mucho más: ver “Dudosos” en el mapa.</li>
+        </ul>
+        <h2>Para qué no usarlo</h2>
+        <ul>
+          <li>Para estimar el rinde de un lote.</li>
+          <li>Fuera de la zona núcleo, donde no se entrenó.</li>
+          <li>En lotes de menos de unas 10 ha.</li>
+          <li>Como prueba para aseguradoras o bancos. Sí como filtro para decidir qué revisar.</li>
+        </ul>
+      </article>
+    </div>
+  </section>
+
+  <!-- ======================= API ======================= -->
+  <section id="pestana-api" class="panel-pestana">
+    <div class="ficha">
+      <article>
+        <div class="aviso-estatico solo-estatico">
+          <span class="sin-vivo"><strong>Versión publicada sin servidor.</strong> El mapa muestra las predicciones que calcularon
+          los notebooks. La API con FastAPI (<code>/predict</code> y <code>/docs</code>) se corre en una computadora.</span>
+          <span class="con-vivo"><strong>El modelo corre en tu navegador</strong>, sin servidor: los 12 modelos se convirtieron
+          a ONNX y dan lo mismo que en Keras. La API con FastAPI (<code>/predict</code> y <code>/docs</code>) hace lo mismo
+          desde un servidor y se corre en una computadora.</span>
+        </div>
+        <h2>La API corre el modelo de verdad</h2>
+        <p class="solo-servidor">La documentación interactiva está en <a href="/docs" target="_blank" rel="noopener">/docs</a>: desde ahí se
+          puede probar <code>POST /predict</code> sin programar.</p>
+        <ol>
+          <li><strong>Por id:</strong> mandá <code>{"id": ...}</code> con el id de un lote de ejemplo. Se usa el modelo que no vio esa campaña.</li>
+          <li><strong>Con un archivo:</strong> un <code>.npz</code> con <code>bandas</code> de forma (27, 16, 16, 10) en uint16:
+            las 10 bandas crudas (B2, B3, B4, B5, B6, B7, B8, B8A, B11, B12) cada 10 días de septiembre a mayo.</li>
+        </ol>
+        <h3 class="solo-vivo">Subí un archivo</h3>
+        <form id="form-subir" class="solo-vivo">
+          <input type="file" id="archivo" accept=".npz" required>
+          <label>Campaña (opcional) <select id="sel-campana-subir"><option value="">la del archivo, si la tiene</option></select></label>
+          <button type="submit">Correr el modelo</button>
+        </form>
+        <div id="resultado-subir" class="solo-vivo"></div>
+      </article>
+      <article>
+        <h2>Archivos de ejemplo</h2>
+        <p>Lotes reales con su serie de imágenes, en el mismo formato que acepta <code>/predict</code>.</p>
+        <label>Campaña <select id="sel-campana-ej"></select></label>
+        <div id="lista-ejemplos"></div>
+      </article>
+    </div>
+  </section>
+</main>
+
+<details class="aclaraciones" id="aclaraciones">
+  <summary>Antes de mirar los números</summary>
+  <ul>
+    <li><strong>Puntos de muestra</strong> en zonas puras de unas 10 ha, no un mapa completo ni una estimación de superficie.</li>
+    <li><strong>Muestra balanceada a propósito</strong> (unos 800 lotes por clase y campaña): los conteos no representan cuánto se sembró de cada cultivo.</li>
+    <li><strong>Cada campaña se predice con el modelo que no la vio</strong> al entrenar.</li>
+    <li><strong>El rinde es por departamento</strong> (MAGyP): el modelo no distingue entre lotes vecinos.</li>
+    <li><strong>Se compara contra el mapa del INTA:</strong> mide coincidencia con ese mapa, no exactitud real.</li>
+  </ul>
+</details>
+
+<footer>
+  <p>María Florencia Romero, Juan Ignacio Flores y Sol Mansilla · Docentes: Javier Fornari y Antonio Rial ·
+    Datos: INTA (Mapa Nacional de Cultivos), ESA Copernicus Sentinel-2, MAGyP.</p>
+</footer>
+
+<script src="static/vendor/leaflet/leaflet.js"></script>
+<script>window.ESTATICO = true;</script>
+<script src="static/modelo.js"></script>
+<script src="static/app.js"></script>
+</body>
+</html>

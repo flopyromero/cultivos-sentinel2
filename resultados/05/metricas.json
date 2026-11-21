@@ -1,0 +1,419 @@
+{
+ "clases": [
+  "Maíz",
+  "Soja 1ra",
+  "Soja 2da",
+  "Otros"
+ ],
+ "aclaracion": "Puntos de muestra en zonas puras (no un mapa completo ni una estimación de superficie). Cada campaña se predice con el modelo que no la vio al entrenar.",
+ "por_campana": {
+  "2019_20": {
+   "enero": {
+    "f1_macro": 0.9473,
+    "lotes": 3013,
+    "aciertos": 2859,
+    "matriz_inta_vs_red": [
+     [
+      762,
+      3,
+      22,
+      13
+     ],
+     [
+      4,
+      742,
+      16,
+      38
+     ],
+     [
+      10,
+      2,
+      784,
+      4
+     ],
+     [
+      32,
+      5,
+      5,
+      571
+     ]
+    ],
+    "mae_rinde_depto": 815.0,
+    "mae_promedio_depto": 783.0
+   },
+   "completa": {
+    "f1_macro": 0.949,
+    "lotes": 3013,
+    "aciertos": 2862,
+    "matriz_inta_vs_red": [
+     [
+      761,
+      3,
+      19,
+      17
+     ],
+     [
+      5,
+      728,
+      35,
+      32
+     ],
+     [
+      8,
+      0,
+      791,
+      1
+     ],
+     [
+      26,
+      1,
+      4,
+      582
+     ]
+    ],
+    "mae_rinde_depto": 717.0,
+    "mae_promedio_depto": 783.0
+   }
+  },
+  "2020_21": {
+   "enero": {
+    "f1_macro": 0.9456,
+    "lotes": 3200,
+    "aciertos": 3026,
+    "matriz_inta_vs_red": [
+     [
+      730,
+      8,
+      28,
+      34
+     ],
+     [
+      18,
+      751,
+      0,
+      31
+     ],
+     [
+      16,
+      5,
+      778,
+      1
+     ],
+     [
+      12,
+      21,
+      0,
+      767
+     ]
+    ],
+    "mae_rinde_depto": 797.0,
+    "mae_promedio_depto": 624.0
+   },
+   "completa": {
+    "f1_macro": 0.9554,
+    "lotes": 3200,
+    "aciertos": 3057,
+    "matriz_inta_vs_red": [
+     [
+      766,
+      1,
+      12,
+      21
+     ],
+     [
+      11,
+      764,
+      2,
+      23
+     ],
+     [
+      18,
+      14,
+      761,
+      7
+     ],
+     [
+      23,
+      9,
+      2,
+      766
+     ]
+    ],
+    "mae_rinde_depto": 653.0,
+    "mae_promedio_depto": 624.0
+   }
+  },
+  "2021_22": {
+   "enero": {
+    "f1_macro": 0.9335,
+    "lotes": 3200,
+    "aciertos": 2988,
+    "matriz_inta_vs_red": [
+     [
+      700,
+      9,
+      54,
+      37
+     ],
+     [
+      19,
+      750,
+      6,
+      25
+     ],
+     [
+      12,
+      4,
+      783,
+      1
+     ],
+     [
+      24,
+      14,
+      7,
+      755
+     ]
+    ],
+    "mae_rinde_depto": 755.0,
+    "mae_promedio_depto": 479.0
+   },
+   "completa": {
+    "f1_macro": 0.9449,
+    "lotes": 3200,
+    "aciertos": 3024,
+    "matriz_inta_vs_red": [
+     [
+      732,
+      11,
+      34,
+      23
+     ],
+     [
+      17,
+      758,
+      5,
+      20
+     ],
+     [
+      20,
+      4,
+      776,
+      0
+     ],
+     [
+      23,
+      14,
+      5,
+      758
+     ]
+    ],
+    "mae_rinde_depto": 665.0,
+    "mae_promedio_depto": 479.0
+   }
+  },
+  "2022_23": {
+   "enero": {
+    "f1_macro": 0.8409,
+    "lotes": 2879,
+    "aciertos": 2422,
+    "matriz_inta_vs_red": [
+     [
+      705,
+      36,
+      42,
+      17
+     ],
+     [
+      108,
+      676,
+      4,
+      12
+     ],
+     [
+      98,
+      14,
+      682,
+      6
+     ],
+     [
+      67,
+      19,
+      34,
+      359
+     ]
+    ],
+    "mae_rinde_depto": 2456.0,
+    "mae_promedio_depto": 2553.0
+   },
+   "completa": {
+    "f1_macro": 0.7741,
+    "lotes": 2879,
+    "aciertos": 2239,
+    "matriz_inta_vs_red": [
+     [
+      674,
+      14,
+      32,
+      80
+     ],
+     [
+      80,
+      649,
+      4,
+      67
+     ],
+     [
+      164,
+      17,
+      494,
+      125
+     ],
+     [
+      38,
+      7,
+      12,
+      422
+     ]
+    ],
+    "mae_rinde_depto": 2546.0,
+    "mae_promedio_depto": 2553.0
+   }
+  },
+  "2023_24": {
+   "enero": {
+    "f1_macro": 0.9207,
+    "lotes": 3200,
+    "aciertos": 2949,
+    "matriz_inta_vs_red": [
+     [
+      646,
+      82,
+      27,
+      45
+     ],
+     [
+      1,
+      782,
+      5,
+      12
+     ],
+     [
+      11,
+      3,
+      780,
+      6
+     ],
+     [
+      13,
+      43,
+      3,
+      741
+     ]
+    ],
+    "mae_rinde_depto": 926.0,
+    "mae_promedio_depto": 953.0
+   },
+   "completa": {
+    "f1_macro": 0.9507,
+    "lotes": 3200,
+    "aciertos": 3043,
+    "matriz_inta_vs_red": [
+     [
+      746,
+      16,
+      6,
+      32
+     ],
+     [
+      1,
+      784,
+      7,
+      8
+     ],
+     [
+      11,
+      1,
+      788,
+      0
+     ],
+     [
+      18,
+      46,
+      11,
+      725
+     ]
+    ],
+    "mae_rinde_depto": 834.0,
+    "mae_promedio_depto": 953.0
+   }
+  },
+  "2024_25": {
+   "enero": {
+    "f1_macro": 0.8856,
+    "lotes": 3200,
+    "aciertos": 2836,
+    "matriz_inta_vs_red": [
+     [
+      777,
+      4,
+      5,
+      14
+     ],
+     [
+      37,
+      722,
+      10,
+      31
+     ],
+     [
+      15,
+      4,
+      766,
+      15
+     ],
+     [
+      196,
+      29,
+      4,
+      571
+     ]
+    ],
+    "mae_rinde_depto": 970.0,
+    "mae_promedio_depto": 804.0
+   },
+   "completa": {
+    "f1_macro": 0.9383,
+    "lotes": 3200,
+    "aciertos": 3001,
+    "matriz_inta_vs_red": [
+     [
+      785,
+      1,
+      1,
+      13
+     ],
+     [
+      22,
+      739,
+      5,
+      34
+     ],
+     [
+      27,
+      2,
+      763,
+      8
+     ],
+     [
+      76,
+      6,
+      4,
+      714
+     ]
+    ],
+    "mae_rinde_depto": 721.0,
+    "mae_promedio_depto": 804.0
+   }
+  }
+ }
+}
