@@ -7,7 +7,8 @@
 (function () {
   const ORT_VERSION = '1.22.0';
   // El motor se sirve desde el mismo Space (no depende de internet externo); jsdelivr queda solo como respaldo.
-  const ORT_LOCAL = new URL('static/vendor/onnxruntime/', document.baseURI).href;   // dirección completa: la pide el motor
+  // dirección completa (la pide el motor); fuera del navegador (tests en Node) no hay document
+  const ORT_LOCAL = typeof document !== 'undefined' ? new URL('static/vendor/onnxruntime/', document.baseURI).href : 'static/vendor/onnxruntime/';
   const ORT_CDN = `https://cdn.jsdelivr.net/npm/onnxruntime-web@${ORT_VERSION}/dist/`;
   const CARPETA = 'onnx/';
   const T_FULL = 27, PATCH = 16, NB = 10, NC = 12;

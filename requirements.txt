@@ -3,13 +3,15 @@ tensorflow==2.21.0
 keras==3.13.2
 numpy==2.4.6
 pandas==2.2.3
+# scikit-learn, matplotlib y rasterio: versión de Colab, no quedó registrada al correr los notebooks.
+# Para reproducir exactamente el Random Forest conviene usar la misma versión de scikit-learn.
 scikit-learn
 matplotlib
 rasterio          # notebook 01
 pyproj            # notebook 01
 earthengine-api   # notebook 02
 
-# Notebook 06: conversión a ONNX (probado con tf2onnx 1.17.0, onnx 1.23.2 y onnxruntime 1.29.0)
+# Notebook 06: conversión a ONNX (corrido con tf2onnx 1.17.0, onnx 1.23.2 y onnxruntime 1.32.0)
 tf2onnx
 onnx
 onnxruntime

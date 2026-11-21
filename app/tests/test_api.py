@@ -1,6 +1,7 @@
-# Tests de la API. Necesitan la carpeta datos_app (la arma el notebook 05) y comparan contra las predicciones
-# guardadas por los notebooks en resultados/. Correr desde app/:
-#     DATOS_APP=ruta/a/datos_app pytest -q
+# Tests de la API. Usan app/datos_app (los 12 modelos y los 192 lotes de ejemplo que exporta el notebook 05,
+# incluidos en el repositorio) y comparan contra las predicciones guardadas por los notebooks en resultados/.
+# Correr desde app/:
+#     pytest -q
 import io
 import os
 import sys
@@ -82,6 +83,20 @@ def test_rechaza_forma_y_tipo_incorrectos():
     r = cliente.post('/predict', files={'archivo': ('lote.npz', npz(bandas=np.ones((9, 16, 16, 10), np.uint16)))})
     assert r.status_code == 422
     r = cliente.post('/predict', files={'archivo': ('lote.npz', npz(bandas=np.ones((27, 16, 16, 10), np.float32)))})
+    assert r.status_code == 422
+
+
+def test_rechaza_enteros_que_no_son_uint16():
+    _, (campana, bandas) = next(iter(api.series().items()))
+    negativas = bandas.astype(np.int16)
+    negativas[0, 0, 0, 0] = -5
+    r = cliente.post('/predict', files={'archivo': ('lote.npz', npz(bandas=negativas, campana=campana))})
+    assert r.status_code == 422 and 'uint16' in r.json()['detail']
+
+
+@pytest.mark.parametrize('cuerpo', ['{"id": ', '{}', '[1, 2]', '{"id": "abc"}'])
+def test_json_mal_formado_da_422(cuerpo):
+    r = cliente.post('/predict', content=cuerpo, headers={'Content-Type': 'application/json'})
     assert r.status_code == 422
 
 

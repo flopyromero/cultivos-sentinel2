@@ -1,8 +1,8 @@
 # API del TP final de IA II (UCA Rosario, 2026): sirve los 12 modelos de "año afuera" con FastAPI.
 #
-# Correr (desde la carpeta app/, con la carpeta datos_app que arma el notebook 05):
+# Correr desde la carpeta app/ (usa app/datos_app: los 12 modelos y los 192 lotes de ejemplo del notebook 05):
 #     pip install -r ../requirements.txt
-#     DATOS_APP=ruta/a/datos_app uvicorn api:app --reload
+#     uvicorn api:app --reload
 # Documentación interactiva en http://127.0.0.1:8000/docs
 #
 # POST /predict acepta:
@@ -13,13 +13,13 @@ import os
 
 import numpy as np
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from inferencia import BANDAS_S2, Modelos, SerieInvalida, validar_serie
 
-DATOS = os.environ.get('DATOS_APP', 'datos_app')
+DATOS = os.environ.get('DATOS_APP', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'datos_app'))
 AVISO_SIN_CAMPANA = ('El archivo no dice de qué campaña es, así que se promediaron los 6 modelos. Si el lote es de una '
-                     'de las campañas del trabajo (2019/20 a 2024/25), uno de esos modelos lo vio al entrenar y el '
+                     'de las campañas del trabajo (2019/20 a 2024/25), 5 de esos 6 modelos lo vieron al entrenar y el '
                      'resultado es optimista: pasá su campaña para usar el modelo que no la vio. Para un lote de una '
                      'campaña nueva, el promedio es lo correcto.')
 
@@ -108,7 +108,11 @@ async def predecir_archivo(archivo: UploadFile = File(...), campana: str | None 
 async def predecir(request: Request):
     # Una sola dirección para los dos casos, como la usa la página
     if request.headers.get('content-type', '').startswith('application/json'):
-        return predecir_por_id(PedidoPorId(**await request.json()))
+        try:
+            pedido = PedidoPorId.model_validate(await request.json())
+        except (ValueError, ValidationError):
+            raise HTTPException(422, 'Se espera un JSON de la forma {"id": 1234}.')
+        return predecir_por_id(pedido)
     form = await request.form()
     if 'archivo' not in form:
         raise HTTPException(422, 'Mandá {"id": ...} en JSON o un "archivo" .npz en multipart.')

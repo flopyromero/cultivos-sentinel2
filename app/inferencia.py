@@ -34,8 +34,8 @@ def validar_serie(bandas, max_ceros=0.01):
         x = x[None]
     if x.shape[1:] != (T_FULL, PATCH, PATCH, len(BANDAS_S2)):
         raise SerieInvalida(f'Se esperaba (27, 16, 16, 10) por lote y llegó {x.shape[1:]}')
-    if not np.issubdtype(x.dtype, np.integer):
-        raise SerieInvalida(f'Se esperaban las bandas crudas en enteros (uint16) y llegó {x.dtype}')
+    if x.dtype != np.uint16:
+        raise SerieInvalida(f'Se esperaban las bandas crudas en uint16 (valores de 0 a 65535) y llegó {x.dtype}')
     huecos = (x == 0).all(-1)                       # píxel-período sin dato en ninguna banda
     if huecos.any():
         n, t = int(huecos.sum()), sorted(set(np.where(huecos)[1].tolist()))

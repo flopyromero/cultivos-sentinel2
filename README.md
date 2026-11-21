@@ -64,8 +64,9 @@ Todas las tablas se pueden verificar con los archivos de [`resultados/`](#result
 ```
 notebooks/     01 a 06, en el orden en que se corren
 resultados/    tablas, particiones y predicciones guardadas por los notebooks 03, 04 y 05
-app/           API con FastAPI, inferencia.py, tests y el código de la página
+app/           API con FastAPI, inferencia.py, tests, código de la página y datos_app/ (los 12 modelos y los 192 lotes de ejemplo, 18 MB)
 informe/       informe en PDF
+servidor/      servidor de "Probalo en tu lote": baja de Earth Engine la serie de un punto elegido en la página
 requirements.txt
 LICENSE
 ```
@@ -112,24 +113,26 @@ El entrenamiento suma más de 10 horas de GPU, así que el 03 se dividió en par
 
 ## La página y la API
 
-**La página** está publicada gratis en Hugging Face Spaces: https://huggingface.co/spaces/Final-IA/Final_IA_II. Muestra lo que dijo la red en enero contra el mapa del INTA, los errores y los casos dudosos, y permite **correr el modelo en vivo** sobre 192 lotes de ejemplo (32 por campaña, vista "Correr en vivo") o sobre un `.npz` propio. Como Hugging Face cobra los Spaces con servidor, el modelo corre **en el navegador**: los 12 modelos convertidos a ONNX (notebook 06) se ejecutan con *onnxruntime-web*, con el mismo preprocesamiento que `inferencia.py`. Su código está en `app/pagina/`; los datos y los modelos que usa están en el Space.
+**La página** está publicada gratis en Hugging Face Spaces: https://huggingface.co/spaces/Final-IA/Final_IA_II. Muestra lo que dijo la red en enero contra el mapa del INTA, los errores y los casos dudosos, y permite **correr el modelo en vivo** sobre 192 lotes de ejemplo (32 por campaña, vista "Correr en vivo") o sobre un `.npz` propio. Como Hugging Face cobra los Spaces con servidor, el modelo corre **en el navegador**: los 12 modelos convertidos a ONNX (notebook 06) se ejecutan con *onnxruntime-web*, con el mismo preprocesamiento que `inferencia.py`. Su código está en `app/pagina/`, pero esa carpeta **no corre sola**: le faltan `static/vendor/` (el motor), `data/`, `onnx/` y `ejemplos/`, que están en el Space. Para verla en una computadora: `git clone https://huggingface.co/spaces/Final-IA/Final_IA_II`, y dentro de esa carpeta `python -m http.server`.
 
-**La API** (`app/api.py`, FastAPI) usa la carpeta `datos_app` que arma el notebook 05:
+**Probalo en tu lote.** Una pestaña de la página permite elegir cualquier punto de la zona núcleo y una campaña, incluida 2025/26, que ningún modelo vio y que el INTA todavía no mapeó. Un servidor chico (`servidor/`, FastAPI en el plan gratuito de Render) baja de Earth Engine la serie de ese lugar preparada igual que en el notebook 02 y la devuelve; la red la clasifica en el navegador con los mismos modelos ONNX. La clave de Earth Engine vive solo en Render, nunca en el repositorio. Detalles en `servidor/README.md`.
+
+**La API** (`app/api.py`, FastAPI) usa `app/datos_app`, que tiene los 12 modelos y los 192 lotes de ejemplo que exporta el notebook 05. Corre y se prueba desde una copia nueva del repositorio:
 
 ```bash
 pip install -r requirements.txt
 cd app
-DATOS_APP=ruta/a/datos_app uvicorn api:app --reload     # documentación en http://127.0.0.1:8000/docs
-DATOS_APP=ruta/a/datos_app pytest -q                    # tests
+uvicorn api:app --reload     # documentación en http://127.0.0.1:8000/docs
+pytest -q                    # tests
 ```
 
 - `POST /predict` con `{"id": 1234}` predice un lote de ejemplo con **el modelo que no vio su campaña**.
 - `POST /predict` con un archivo `.npz` (`bandas` de forma (27, 16, 16, 10) en uint16, las 10 bandas crudas B2, B3, B4, B5, B6, B7, B8, B8A, B11, B12 cada 10 días de septiembre a mayo) y `campana` opcional.
-- **La serie tiene que venir preparada como en el notebook 02** (nubes enmascaradas, mediana cada 10 días y huecos interpolados). `inferencia.validar_serie()` rechaza series con píxeles sin dato (0 en todas las bandas) o con más del 1 % de píxeles con alguna banda en 0. La página hace el mismo control.
+- **La serie tiene que venir preparada como en el notebook 02** (nubes enmascaradas, mediana cada 10 días y huecos interpolados). `inferencia.validar_serie()` rechaza series que no vienen en `uint16`, con píxeles sin dato (0 en todas las bandas) o con más del 1 % de píxeles con alguna banda en 0. La página hace el mismo control. Un JSON mal formado o un archivo que no es un `.npz` válido devuelven error 422 con la explicación.
 - **Sin campaña** se promedian los 6 modelos. Si el lote es de una de las campañas del trabajo, 5 de esos 6 modelos lo vieron al entrenar y el resultado es optimista: la API y la página lo avisan. Para un lote de una campaña nueva, el promedio es lo correcto.
-- **Tests** (`app/tests/test_api.py`): la API predice los 192 lotes de ejemplo y se compara con lo que guardaron los notebooks en `resultados/` (misma clase en al menos el 99,5 % y el mismo rinde, con una tolerancia de 25 kg/ha). También prueban que un archivo da lo mismo que su id, el aviso sin campaña y que se rechazan series con huecos o con forma o tipo incorrectos.
+- **Tests** (`app/tests/test_api.py`): la API predice los 192 lotes de ejemplo y se compara con lo que guardaron los notebooks en `resultados/` (misma clase en al menos el 99,5 % y el mismo rinde, con una tolerancia de 25 kg/ha). También prueban que un archivo da lo mismo que su id, el aviso sin campaña y que se rechazan series con huecos, con forma o tipo incorrectos (por ejemplo, valores negativos en `int16`) y pedidos JSON mal formados.
 
-`app/inferencia.py` es el mismo que exporta el notebook 05, más la validación de la serie.
+`app/inferencia.py` es el mismo que escribe el notebook 05 (la validación se agregó después de ejecutarlo; no cambia sus salidas).
 
 ## Limitaciones
 

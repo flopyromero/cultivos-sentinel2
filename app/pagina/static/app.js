@@ -94,7 +94,7 @@ async function predecirEnNavegador(opciones) {
   r.nota = 'Calculado en tu navegador con el modelo convertido a ONNX, sin servidor.';
   if (!campana) {
     r.aviso = 'El archivo no dice de qué campaña es, así que se promediaron los 6 modelos. Si el lote es de una de las campañas '
-      + 'del trabajo (2019/20 a 2024/25), uno de esos modelos lo vio al entrenar y el resultado es optimista: elegí su campaña '
+      + 'del trabajo (2019/20 a 2024/25), 5 de esos 6 modelos lo vieron al entrenar y el resultado es optimista: elegí su campaña '
       + 'para usar el modelo que no la vio. Para un lote de una campaña nueva, el promedio es lo correcto.';
   }
   return r;
