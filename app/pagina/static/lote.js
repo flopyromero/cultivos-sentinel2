@@ -242,7 +242,7 @@
         <p class="nota">La línea negra es este lote; las punteadas, la curva típica de cada cultivo en la zona. El lote se parece
           al cultivo cuya curva sigue. ${fmt(s.pct_interpolado, 1)} % de la serie se completó por nubes.</p>
         <h3>Qué dijo la red</h3>
-        <p class="sub">Con ${modelo}. <strong>En enero</strong> es el pronóstico temprano, con las imágenes hasta mediados de enero;
+        <p class="sub">Con ${modelo}. <strong>En enero</strong> es el pronóstico temprano, con las imágenes hasta fin de enero;
           <strong>con la campaña completa</strong> es la confirmación, con todas las imágenes hasta mayo.</p>
         ${bloqueProbs('En enero', r.enero, null)}
         ${bloqueProbs('Con la campaña completa', r.completa, null)}
