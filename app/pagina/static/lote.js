@@ -229,7 +229,7 @@
       }
       if (s.pct_interpolado > 30) avisos.push(`Campaña muy nublada en este lugar: el ${fmt(s.pct_interpolado, 0)} % de la serie se completó interpolando.`);
       const modelo = usar ? `el modelo que no vio ${camp(c)}`
-        : 'el promedio de los 6 modelos: ninguno vio esta campaña y el INTA todavía no publicó su mapa';
+        : 'el promedio de los 6 modelos: ninguno vio esta campaña y el INTA todavía no publicó su mapa, así que el resultado todavía no se puede verificar';
       const rinde = (q) => q.rinde_kg_ha === null ? '' : `<tr><td>${q === r.enero ? 'En enero' : 'Campaña completa'}</td><td class="num">${fmt(q.rinde_kg_ha)}</td></tr>`;
       const lugar = s.departamento ? `${esc(s.departamento)}, ${esc(s.provincia)} · ` : '';
       ins.className = 'inspector';

@@ -185,30 +185,43 @@ _cache = OrderedDict()
 _cache_lock = threading.Lock()
 _simultaneos = threading.Semaphore(3)            # 512 MB de RAM: pocos pedidos a la vez
 LIMITE_POR_IP, VENTANA_S = 40, 3600              # pedidos nuevos (no en caché) por IP y por hora
+LIMITE_TOTAL = 400                               # y en total, por hora: tope que no depende de identificar a nadie
 _pedidos = defaultdict(deque)
+_todos = deque()
 _pedidos_lock = threading.Lock()
 
 
 def ip_de(request: Request):
-    reenviada = request.headers.get('x-forwarded-for', '')
-    return reenviada.split(',')[0].strip() if reenviada else (request.client.host if request.client else '?')
+    # Render está detrás de Cloudflare, que pone la IP real en CF-Connecting-IP y pisa cualquier valor que mande el
+    # cliente. Si no está, se usa la ÚLTIMA dirección de X-Forwarded-For (la agrega el proxy, no el cliente): la
+    # primera la puede inventar cualquiera y saltearía el límite.
+    cf = request.headers.get('cf-connecting-ip', '').strip()
+    if cf:
+        return cf
+    reenviada = [x.strip() for x in request.headers.get('x-forwarded-for', '').split(',') if x.strip()]
+    if reenviada:
+        return reenviada[-1]
+    return request.client.host if request.client else '?'
 
 
 def controlar_limite(ip):
     ahora = time.time()
     with _pedidos_lock:
-        q = _pedidos[ip]
-        while q and ahora - q[0] > VENTANA_S:
-            q.popleft()
-        if len(q) >= LIMITE_POR_IP:
+        for q in (_pedidos[ip], _todos):
+            while q and ahora - q[0] > VENTANA_S:
+                q.popleft()
+        if len(_todos) >= LIMITE_TOTAL:
+            raise HTTPException(429, 'El servidor recibió demasiados pedidos en la última hora. Probá de nuevo en un rato.')
+        if len(_pedidos[ip]) >= LIMITE_POR_IP:
             raise HTTPException(429, 'Demasiados pedidos desde esta conexión. Probá de nuevo en un rato.')
-        q.append(ahora)
+        _pedidos[ip].append(ahora)
+        _todos.append(ahora)
 
 
 @app.get('/')
 @app.get('/salud')
-def salud():
-    return {'ok': True, 'earth_engine': EE['listo'], 'error': EE['error'], 'campanas': CAMPANAS,
+def salud(request: Request):
+    return {'ok': True, 'tu_ip': ip_de(request), 'earth_engine': EE['listo'], 'error': EE['error'], 'campanas': CAMPANAS,
             'region': dict(zip(['oeste', 'sur', 'este', 'norte'], REGION_LIMITES))}
 
 

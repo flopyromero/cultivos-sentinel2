@@ -30,6 +30,7 @@ def cliente(monkeypatch):
     monkeypatch.setitem(main.EE, 'listo', True)
     main._cache.clear()
     main._pedidos.clear()
+    main._todos.clear()
     with TestClient(main.app) as c:
         main.EE['listo'] = True          # el arranque sin EE_CLAVE lo marca como no listo
         yield c
@@ -107,3 +108,25 @@ def test_error_de_clave_no_muestra_la_clave(monkeypatch, clave):
     monkeypatch.setitem(main.EE, 'listo', False)
     main.iniciar_ee()
     assert main.EE['listo'] is False and 'SECRETO' not in main.EE['error'] and 'private_key' not in main.EE['error']
+
+
+def test_limite_no_se_saltea_inventando_la_ip(cliente, monkeypatch):
+    monkeypatch.setattr(main, 'LIMITE_POR_IP', 2)
+    real = {'CF-Connecting-IP': '200.1.1.1'}
+    for k in range(2):
+        falsa = {**real, 'X-Forwarded-For': f'9.9.9.{k}'}         # el cliente inventa otra IP en cada pedido
+        assert cliente.get('/serie', params={'lat': -33 + k / 100, 'lon': -61, 'campana': '2025_26'}, headers=falsa).status_code == 200
+    r = cliente.get('/serie', params={'lat': -33.5, 'lon': -61, 'campana': '2025_26'}, headers={**real, 'X-Forwarded-For': '8.8.8.8'})
+    assert r.status_code == 429
+
+
+def test_sin_cloudflare_usa_la_ultima_ip_reenviada(cliente):
+    r = cliente.get('/salud', headers={'X-Forwarded-For': '6.6.6.6, 190.2.2.2'}).json()
+    assert r['tu_ip'] == '190.2.2.2'
+
+
+def test_limite_total(cliente, monkeypatch):
+    monkeypatch.setattr(main, 'LIMITE_TOTAL', 3)
+    codigos = [cliente.get('/serie', params={'lat': -33 + k / 100, 'lon': -61, 'campana': '2025_26'},
+                           headers={'CF-Connecting-IP': f'10.0.0.{k}'}).status_code for k in range(4)]
+    assert codigos == [200, 200, 200, 429]
