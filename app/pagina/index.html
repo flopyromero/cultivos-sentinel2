@@ -18,8 +18,8 @@
   </div>
   <nav aria-label="Secciones" role="tablist">
     <button class="pestana activa" role="tab" aria-selected="true" data-pestana="mapa">Mapa</button>
+    <button class="pestana" role="tab" aria-selected="false" data-pestana="lote">Probalo en tu lote</button>
     <button class="pestana" role="tab" aria-selected="false" data-pestana="modelo">El modelo</button>
-    <button class="pestana" role="tab" aria-selected="false" data-pestana="api">Probá la API</button>
   </nav>
 </header>
 
@@ -106,39 +106,32 @@
     </div>
   </section>
 
-  <!-- ======================= API ======================= -->
-  <section id="pestana-api" class="panel-pestana">
-    <div class="ficha">
-      <article>
-        <div class="aviso-estatico solo-estatico">
-          <span class="sin-vivo"><strong>Versión publicada sin servidor.</strong> El mapa muestra las predicciones que calcularon
-          los notebooks. La API con FastAPI (<code>/predict</code> y <code>/docs</code>) se corre en una computadora.</span>
-          <span class="con-vivo"><strong>El modelo corre en tu navegador</strong>, sin servidor: los 12 modelos se convirtieron
-          a ONNX y dan lo mismo que en Keras. La API con FastAPI (<code>/predict</code> y <code>/docs</code>) hace lo mismo
-          desde un servidor y se corre en una computadora.</span>
+  <!-- ======================= LOTE NUEVO ======================= -->
+  <section id="pestana-lote" class="panel-pestana">
+    <p class="aviso-corto">Elegí cualquier lote de la zona núcleo y una campaña: se bajan sus imágenes satelitales (Sentinel-2) de toda la
+      campaña, se preparan igual que en el trabajo y la red las clasifica en tu navegador. En <strong>2025/26</strong> ningún modelo vio la campaña y el
+      INTA todavía no publicó su mapa: es una predicción de verdad.</p>
+    <div class="controles">
+      <form id="form-buscar" class="buscador">
+        <input type="search" id="buscar-lugar" placeholder="Localidad o coordenadas (ej. Casilda, o -33.04, -61.17)" aria-label="Buscar un lugar">
+        <button type="submit">Ir</button>
+      </form>
+      <label>Campaña <select id="sel-campana-lote"></select></label>
+      <button class="principal" id="btn-analizar" disabled>Analizar este lote</button>
+    </div>
+    <div class="mapa-y-inspector">
+      <div class="mapa-caja">
+        <div id="mapa-lote"></div>
+      </div>
+      <aside id="resultado-lote" class="inspector vacio">
+        <div class="ayuda">
+          <p><strong>1.</strong> Buscá una localidad y acercate hasta ver los lotes.</p>
+          <p><strong>2.</strong> Hacé clic en el <strong>medio de un lote</strong>: el cuadrado de 160 m tiene que quedar todo adentro,
+            lejos de caminos, casas y bordes.</p>
+          <p><strong>3.</strong> Elegí la campaña y tocá <em>Analizar este lote</em>.</p>
+          <p class="nota" id="estado-servidor"></p>
         </div>
-        <h2>La API corre el modelo de verdad</h2>
-        <p class="solo-servidor">La documentación interactiva está en <a href="/docs" target="_blank" rel="noopener">/docs</a>: desde ahí se
-          puede probar <code>POST /predict</code> sin programar.</p>
-        <ol>
-          <li><strong>Por id:</strong> mandá <code>{"id": ...}</code> con el id de un lote de ejemplo. Se usa el modelo que no vio esa campaña.</li>
-          <li><strong>Con un archivo:</strong> un <code>.npz</code> con <code>bandas</code> de forma (27, 16, 16, 10) en uint16:
-            las 10 bandas crudas (B2, B3, B4, B5, B6, B7, B8, B8A, B11, B12) cada 10 días de septiembre a mayo.</li>
-        </ol>
-        <h3 class="solo-vivo">Subí un archivo</h3>
-        <form id="form-subir" class="solo-vivo">
-          <input type="file" id="archivo" accept=".npz" required>
-          <label>Campaña (opcional) <select id="sel-campana-subir"><option value="">la del archivo, si la tiene</option></select></label>
-          <button type="submit">Correr el modelo</button>
-        </form>
-        <div id="resultado-subir" class="solo-vivo"></div>
-      </article>
-      <article>
-        <h2>Archivos de ejemplo</h2>
-        <p>Lotes reales con su serie de imágenes, en el mismo formato que acepta <code>/predict</code>.</p>
-        <label>Campaña <select id="sel-campana-ej"></select></label>
-        <div id="lista-ejemplos"></div>
-      </article>
+      </aside>
     </div>
   </section>
 </main>
@@ -163,5 +156,8 @@
 <script>window.ESTATICO = true;</script>
 <script src="static/modelo.js"></script>
 <script src="static/app.js"></script>
+<!-- Servidor que baja las imágenes de Earth Engine para "Probalo en tu lote" (vacío: la sección queda deshabilitada) -->
+<script>window.SERVIDOR_LOTES = 'https://cultivos-lote.onrender.com';</script>
+<script src="static/lote.js"></script>
 </body>
 </html>

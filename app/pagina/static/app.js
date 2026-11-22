@@ -91,7 +91,7 @@ async function predecirEnNavegador(opciones) {
       Object.assign(r, { guardado: det.guardado, clase_inta: det.lote.clase_inta, rinde_real: det.lote.rinde_real });
     } catch { /* el lote no está en la muestra publicada: no hay con qué comparar */ }
   }
-  r.nota = 'Calculado en tu navegador con el modelo convertido a ONNX, sin servidor.';
+  r.nota = 'Calculado en tu navegador, en este momento.';
   if (!campana) {
     r.aviso = 'El archivo no dice de qué campaña es, así que se promediaron los 6 modelos. Si el lote es de una de las campañas '
       + 'del trabajo (2019/20 a 2024/25), 5 de esos 6 modelos lo vieron al entrenar y el resultado es optimista: elegí su campaña '
@@ -119,7 +119,7 @@ async function apiEstatica(url, opciones) {
     return { ...d, tipica: tip[d.clave_tipica] };
   }
   if (url === '/predict' && EN_VIVO) return predecirEnNavegador(opciones);
-  throw new Error('El modelo en vivo no está disponible: no se encontraron los modelos ONNX publicados.');
+  throw new Error('El modelo no está disponible en este momento. Probá recargar la página.');
 }
 
 async function api(url, opciones) {
@@ -373,7 +373,7 @@ function htmlResultado(r) {
     let comp = '';
     if (r.guardado) {
       const dm = difMax(p.probabilidades, r.guardado[m].probabilidades);
-      comp = ` · ${p.cultivo === r.guardado[m].cultivo && dm < 0.01 ? '<span class="ok">igual a lo calculado en los notebooks</span>' : `<span class="mal">difiere de lo guardado (máx. ${dm.toFixed(3)})</span>`}`;
+      comp = ` · ${p.cultivo === r.guardado[m].cultivo && dm < 0.01 ? '<span class="ok">igual al resultado de la evaluación del trabajo</span>' : `<span class="mal">difiere de lo guardado (máx. ${dm.toFixed(3)})</span>`}`;
     }
     const top = Math.max(...Object.values(p.probabilidades));
     return `<div><strong>${m === 'enero' ? 'En enero' : 'Campaña completa'}:</strong> ${esc(p.cultivo)} (${fmt(100 * top, 0)} %)
@@ -431,6 +431,7 @@ function dibujarMetricas() {
 // ------------------------------------------------------------------ probá la API
 let ejemplos = [];
 function dibujarEjemplos() {
+  if (!$('#lista-ejemplos')) return;   // la pestaña de ejemplos se sacó: los lotes guardados se corren desde el mapa
   const c = $('#sel-campana-ej').value;
   const lista = ejemplos.filter((e) => e.campana === c && (!ESTATICO || archivoDe(e.id)));
   $('#lista-ejemplos').innerHTML = `<table><tr><th>Id</th><th>Según el INTA</th><th></th><th></th></tr>
@@ -442,7 +443,7 @@ function dibujarEjemplos() {
     b.addEventListener('click', () => correrPorId(Number(b.dataset.id), b, $(`#res-ej-${b.dataset.id}`))));
 }
 
-$('#form-subir').addEventListener('submit', async (ev) => {
+$('#form-subir')?.addEventListener('submit', async (ev) => {
   ev.preventDefault();
   const f = $('#archivo').files[0];
   if (!f) return;
@@ -465,12 +466,12 @@ $('#form-subir').addEventListener('submit', async (ev) => {
     estado.clases = metricas.clases || Object.keys(COLORES);
     const opciones = campanas.map((c) => `<option value="${c}">${camp(c)}</option>`).join('');
     $('#sel-campana').innerHTML = opciones;
-    $('#sel-campana-ej').innerHTML = opciones;
-    $('#sel-campana-subir').innerHTML += opciones;
+    if ($('#sel-campana-ej')) $('#sel-campana-ej').innerHTML = opciones;
+    if ($('#sel-campana-subir')) $('#sel-campana-subir').innerHTML += opciones;
     const inicial = campanas[campanas.length - 1];
     $('#sel-campana').value = inicial;
     $('#sel-campana').addEventListener('change', (e) => cargarCampana(e.target.value));
-    $('#sel-campana-ej').addEventListener('change', dibujarEjemplos);
+    $('#sel-campana-ej')?.addEventListener('change', dibujarEjemplos);
     dibujarMetricas();
     await cargarCampana(inicial);
     ejemplos = await api('/api/ejemplos');

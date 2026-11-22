@@ -161,7 +161,7 @@
     }
     if (huecos) {
       throw new Error(`La serie tiene ${huecos} píxeles sin dato (0 en todas las bandas) en los períodos ${[...periodos].join(', ')}. `
-        + 'El modelo espera la serie preparada como en el notebook 02: nubes enmascaradas, mediana cada 10 días y huecos interpolados.');
+        + 'El modelo espera la serie preparada igual que en el trabajo: nubes enmascaradas, mediana cada 10 días y huecos completados.');
     }
     if (conCero / npx > 0.01) {
       throw new Error(`El ${(100 * conCero / npx).toFixed(1).replace('.', ',')} % de los píxeles tiene alguna banda en 0 `
@@ -173,7 +173,7 @@
   function cargarScript(url) {
     return new Promise((ok, mal) => {
       const s = document.createElement('script');
-      s.src = url; s.onload = ok; s.onerror = () => mal(new Error('No se pudo descargar el motor del modelo (onnxruntime-web).'));
+      s.src = url; s.onload = ok; s.onerror = () => mal(new Error('No se pudo descargar el motor del modelo. Probá recargar la página.'));
       document.head.appendChild(s);
     });
   }

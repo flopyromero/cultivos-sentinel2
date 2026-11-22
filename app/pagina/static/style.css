@@ -171,3 +171,16 @@ body.estatico:not(.en-vivo) .solo-vivo { display: none !important; }
 /* botón "Correr en vivo": en línea como los demás, y solo si el modelo corre en el navegador */
 .grupo-botones button.solo-vivo { display: inline-block; }
 body.estatico:not(.en-vivo) .grupo-botones button.solo-vivo { display: none; }
+
+/* ---- Probalo en tu lote ---- */
+#mapa-lote { height: 640px; border-radius: var(--radio); border: 1px solid var(--linea); cursor: crosshair; }
+.buscador { display: flex; gap: 6px; flex: 1 1 340px; }
+.buscador input { flex: 1; min-width: 0; padding: 7px 10px; border: 1px solid var(--linea); border-radius: 8px; font: inherit; }
+.buscador button { padding: 7px 14px; }
+#resultado-lote .ayuda p { margin: 0 0 10px; }
+.esperando { display: flex; gap: 10px; align-items: center; }
+.esperando::before { content: ""; width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--linea);
+  border-top-color: var(--acento, #2f6b4f); animation: girar 0.9s linear infinite; flex: none; }
+@keyframes girar { to { transform: rotate(360deg); } }
+#btn-analizar:disabled { cursor: not-allowed; }
+@media (max-width: 1000px) { #mapa-lote { height: 420px; } }
