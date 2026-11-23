@@ -91,7 +91,7 @@ El entrenamiento suma más de 10 horas de GPU, así que el 03 se dividió en par
 
 ## Cómo reproducir
 
-1. **Drive:** crear la carpeta `MyDrive/TP_final_IA2` (o un acceso directo a ella). Todos los notebooks leen y escriben ahí.
+1. **Drive:** crear una carpeta vacía `MyDrive/TP_final_IA2` en el Google Drive propio. Todos los notebooks leen y escriben ahí. No hace falta acceso a ninguna carpeta compartida: los notebooks 01 y 02 la llenan descargando todo de las fuentes públicas.
 2. **Earth Engine (notebook 02):** hace falta una cuenta de Google Earth Engine con un proyecto de Google Cloud habilitado. En el 02, cambiar `ee.Initialize(project='tp-cultivos-ia2')` por el proyecto propio.
 3. **Entrenamiento (03 y 04):** con GPU (T4 o L4). La variable `PARTE` elige qué esquema corre cada sesión (`'depto'`, `'anio'` o `'todo'`).
 4. **Retoma automática:** cada entrenamiento se guarda en Drive con una *huella* (configuración + código del modelo + ids de las particiones); al volver a correr, lo que ya está hecho se carga en segundos. **Limitación:** la huella no incluye el contenido del dataset. Si se vuelve a generar el dataset con el 02, hay que borrar las carpetas `corridas/` para que se reentrene todo. El notebook 05 verifica, de todos modos, que los modelos exportados reproducen las predicciones guardadas.
@@ -115,7 +115,7 @@ El entrenamiento suma más de 10 horas de GPU, así que el 03 se dividió en par
 
 **La página** está publicada gratis en Hugging Face Spaces: https://huggingface.co/spaces/Final-IA/Final_IA_II. Muestra lo que dijo la red en enero contra el mapa del INTA, los errores y los casos dudosos, y permite **correr el modelo en vivo** sobre 192 lotes de ejemplo (32 por campaña, vista "Correr en vivo" del mapa). La API (`app/api.py`) también acepta un `.npz` propio. Como Hugging Face cobra los Spaces con servidor, el modelo corre **en el navegador**: los 12 modelos convertidos a ONNX (notebook 06) se ejecutan con *onnxruntime-web*, con el mismo preprocesamiento que `inferencia.py`. Su código está en `app/pagina/`, pero esa carpeta **no corre sola**: le faltan `static/vendor/` (el motor), `data/`, `onnx/` y `ejemplos/`, que están en el Space. Para verla en una computadora: `git clone https://huggingface.co/spaces/Final-IA/Final_IA_II`, y dentro de esa carpeta `python -m http.server`.
 
-**Probalo en tu lote.** Una pestaña de la página permite elegir cualquier punto de la zona núcleo y una campaña, incluida 2025/26, que ningún modelo vio y que el INTA todavía no mapeó. Un servidor chico (`servidor/`, FastAPI en el plan gratuito de Render) baja de Earth Engine la serie de ese lugar preparada igual que en el notebook 02 y la devuelve; la red la clasifica en el navegador con los mismos modelos ONNX. La clave de Earth Engine vive solo en Render, nunca en el repositorio. Detalles en `servidor/README.md`.
+**Probalo en tu lote.** Una pestaña de la página permite elegir cualquier punto de la zona núcleo y una campaña, incluida 2025/26, que ningún modelo vio y que el INTA todavía no mapeó. Un servidor chico (`servidor/`, FastAPI en el plan gratuito de Render) baja de Earth Engine la serie de ese lugar preparada igual que en el notebook 02 y la devuelve; la red la clasifica en el navegador con los mismos modelos ONNX. Antes de bajar la serie, el servidor revisa con **Dynamic World** (mapa de cobertura del suelo de Google, hecho con Sentinel-2 a 10 m) qué hay en ese recuadro durante la campaña: si más de la mitad es zona construida, agua, árboles o bañado, no clasifica y avisa que el punto no parece un lote. Pasto y suelo desnudo no se frenan, para no bloquear barbechos ni pasturas. Es una capa aparte: el modelo y los resultados no cambian. La clave de Earth Engine vive solo en Render, nunca en el repositorio. Detalles en `servidor/README.md`.
 
 **La API** (`app/api.py`, FastAPI) usa `app/datos_app`, que tiene los 12 modelos y los 192 lotes de ejemplo que exporta el notebook 05. Corre y se prueba desde una copia nueva del repositorio:
 
@@ -147,6 +147,7 @@ pytest -q                    # tests
 - **Copernicus Sentinel-2** nivel 2A, vía Google Earth Engine: acceso libre, completo y abierto. *Contains modified Copernicus Sentinel data 2019-2025.*
 - **MAGyP, Estimaciones agrícolas** (datos.gob.ar), bajo **Creative Commons Attribution 4.0**.
 - **ERA5-Land** (Muñoz-Sabater, 2019; Copernicus Climate Change Service, Climate Data Store), bajo **CC BY 4.0**. *Generated using Copernicus Climate Change Service information 2019-2025.*
+- **Dynamic World** (Brown et al., 2022, *Scientific Data*), vía Google Earth Engine, bajo **CC BY 4.0**: solo para el filtro de "Probalo en tu lote", que se agregó después de entregar el informe.
 
 La lista completa de referencias está en el informe.
 
