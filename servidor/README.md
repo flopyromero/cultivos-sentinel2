@@ -9,6 +9,13 @@ la página del Space, con los mismos modelos ONNX y la misma validación que los
 |---|---|
 | `GET /salud` | Estado del servidor y de la conexión con Earth Engine |
 | `GET /serie?lat=-33.04&lon=-61.17&campana=2025_26` | Serie `(27, 16, 16, 10)` en `uint16`, en base64, con el porcentaje interpolado, las esquinas del parche y el departamento |
+| `GET /cobertura?lat=-33.04&lon=-61.17&campana=2025_26` | Para probar el filtro: qué ve Dynamic World en el parche y si lo consideraría un lote |
+
+**Filtro de cobertura** (`cobertura.py`). La red siempre elige una de sus 4 clases, aunque el punto sea un pueblo o un
+río. Antes de bajar la serie, el servidor mira Dynamic World (cobertura del suelo de Google, Sentinel-2, 10 m) en el
+parche durante la campaña: si más de la mitad es construido, agua, árboles o bañado, responde `422` con un mensaje que
+la página muestra tal cual, y no clasifica. Pasto, suelo desnudo o arbustos no se rechazan (un barbecho o una pastura
+pueden verse así). Si Dynamic World falla, el pedido sigue como antes. Se apaga con la variable `FILTRO_COBERTURA=0`.
 
 Solo acepta puntos de la zona del trabajo (longitud −63,6 a −59,5, latitud −34,3 a −31,4) y las campañas 2019/20 a
 2025/26. Guarda en memoria los últimos 300 parches y limita los pedidos nuevos por conexión.

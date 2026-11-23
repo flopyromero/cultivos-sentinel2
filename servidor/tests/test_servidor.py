@@ -27,6 +27,7 @@ def crudo_falso(campana, x0, y0, intentos=4):
 def cliente(monkeypatch):
     monkeypatch.setattr(main, 'bajar_crudo', crudo_falso)
     monkeypatch.setattr(main, 'departamento_de', lambda lon, lat: ('CASEROS', 'Santa Fe'))
+    monkeypatch.setattr(main.cobertura, 'probabilidades', lambda *a, **k: None)   # sin Earth Engine: el filtro se saltea
     monkeypatch.setitem(main.EE, 'listo', True)
     main._cache.clear()
     main._pedidos.clear()
@@ -130,3 +131,46 @@ def test_limite_total(cliente, monkeypatch):
     codigos = [cliente.get('/serie', params={'lat': -33 + k / 100, 'lon': -61, 'campana': '2025_26'},
                            headers={'CF-Connecting-IP': f'10.0.0.{k}'}).status_code for k in range(4)]
     assert codigos == [200, 200, 200, 429]
+
+
+# ------------------------------------------------------------------ filtro de cobertura (Dynamic World)
+def prob_dw(**dominante):
+    base = {c: 0.02 for c in main.cobertura.CLASES_DW}
+    base.update(dominante)
+    return base
+
+
+def test_decidir_lote_y_no_lote():
+    assert main.cobertura.decidir(prob_dw(crops=0.8))[0] is True
+    assert main.cobertura.decidir(prob_dw(grass=0.5, bare=0.3))[0] is True        # barbecho o pastura: no se rechaza
+    es, motivo, pct = main.cobertura.decidir(prob_dw(built=0.7))
+    assert es is False and motivo == 'built' and pct > 50
+    assert main.cobertura.decidir(prob_dw(trees=0.4, water=0.3))[1] == 'trees'
+    assert main.cobertura.decidir(None) == (True, None, None)                       # sin datos no bloquea
+
+
+def test_ciudad_se_rechaza_con_mensaje(cliente, monkeypatch):
+    monkeypatch.setattr(main.cobertura, 'probabilidades', lambda *a, **k: prob_dw(built=0.8))
+    r = cliente.get('/serie', params={**PUNTO, 'campana': '2024_25'})
+    assert r.status_code == 422 and 'no parece un lote' in r.json()['detail'] and 'construida' in r.json()['detail']
+
+
+def test_lote_pasa_y_devuelve_cobertura(cliente, monkeypatch):
+    monkeypatch.setattr(main.cobertura, 'probabilidades', lambda *a, **k: prob_dw(crops=0.8))
+    r = cliente.get('/serie', params={**PUNTO, 'campana': '2024_25'})
+    assert r.status_code == 200 and r.json()['cobertura']['crops'] == 0.8
+
+
+def test_filtro_apagado_vuelve_al_comportamiento_anterior(cliente, monkeypatch):
+    monkeypatch.setenv('FILTRO_COBERTURA', '0')
+    llamado = []
+    monkeypatch.setattr(main.cobertura, 'probabilidades', lambda *a, **k: llamado.append(1) or prob_dw(built=0.9))
+    r = cliente.get('/serie', params={**PUNTO, 'campana': '2024_25'})
+    assert r.status_code == 200 and not llamado and r.json()['cobertura'] is None
+    assert cliente.get('/salud').json()['filtro_cobertura'] is False
+
+
+def test_ruta_para_probar_el_filtro(cliente, monkeypatch):
+    monkeypatch.setattr(main.cobertura, 'probabilidades', lambda *a, **k: prob_dw(water=0.9))
+    r = cliente.get('/cobertura', params={**PUNTO, 'campana': '2025_26'}).json()
+    assert r['es_lote'] is False and r['motivo'] == 'water' and 'agua' in r['mensaje']

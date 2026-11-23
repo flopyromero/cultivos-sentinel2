@@ -8,6 +8,8 @@
 # Variables de entorno:
 #   EE_CLAVE   contenido del .json de la cuenta de servicio de Earth Engine (secreto: se carga en Render, nunca en git)
 #   ORIGENES   páginas que pueden usar el servidor, separadas por coma (por defecto, la del Space)
+#   FILTRO_COBERTURA  1 (por defecto) para avisar cuando el punto no es un lote agrícola (Dynamic World, ver
+#              cobertura.py); 0 para apagarlo y volver al comportamiento anterior sin tocar el código
 #
 # Local:  EE_CLAVE="$(cat clave.json)" uvicorn main:app --reload
 
@@ -25,6 +27,8 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pyproj import Transformer
+
+import cobertura
 
 # ------------------------------------------------------------------ constantes del notebook 02 (no cambiar)
 REGION_LIMITES = (-63.6, -34.3, -59.5, -31.4)          # oeste, sur, este, norte: la zona del trabajo
@@ -191,6 +195,26 @@ _todos = deque()
 _pedidos_lock = threading.Lock()
 
 
+def filtro_activo():
+    return os.environ.get('FILTRO_COBERTURA', '1').strip().lower() not in ('0', 'no', 'false', 'off')
+
+
+def revisar_cobertura(campana, x0, y0):
+    # Filtro previo (cobertura.py): si el parche es mayormente construido, agua, monte o bañado, no se clasifica.
+    # Si Dynamic World falla, devuelve None y el pedido sigue como antes.
+    inicio = inicio_de(campana)
+    prob = cobertura.probabilidades(inicio, periodos(inicio)[-1][1], x0, y0)
+    es_lote, motivo, pct = cobertura.decidir(prob)
+    return prob, es_lote, motivo, pct
+
+
+def mensaje_no_lote(campana, motivo, pct):
+    return (f'Este punto no parece un lote con cultivo: según el mapa de cobertura Dynamic World, en la campaña '
+            f'{campana.replace("_", "/")} el {pct:.0f} % del recuadro no es agrícola: es sobre todo '
+            f'{cobertura.NO_AGRICOLAS[motivo]}. '
+            'La red solo sabe reconocer cultivos, así que no lo clasifica. Elegí un punto en el medio de un lote.')
+
+
 def ip_de(request: Request):
     # Render está detrás de Cloudflare, que pone la IP real en CF-Connecting-IP y pisa cualquier valor que mande el
     # cliente. Si no está, se usa la ÚLTIMA dirección de X-Forwarded-For (la agrega el proxy, no el cliente): la
@@ -222,7 +246,41 @@ def controlar_limite(ip):
 @app.get('/salud')
 def salud(request: Request):
     return {'ok': True, 'tu_ip': ip_de(request), 'earth_engine': EE['listo'], 'error': EE['error'], 'campanas': CAMPANAS,
-            'region': dict(zip(['oeste', 'sur', 'este', 'norte'], REGION_LIMITES))}
+            'region': dict(zip(['oeste', 'sur', 'este', 'norte'], REGION_LIMITES)), 'filtro_cobertura': filtro_activo()}
+
+
+def validar(lat, lon, campana):
+    if campana not in CAMPANAS:
+        raise HTTPException(422, f'Campaña desconocida: {campana}. Opciones: {", ".join(CAMPANAS)}.')
+    oeste, sur, este, norte = REGION_LIMITES
+    if not (oeste <= lon <= este and sur <= lat <= norte):
+        raise HTTPException(422, 'El punto está fuera de la zona del trabajo (núcleo pampeano: '
+                                 f'longitud {oeste} a {este}, latitud {sur} a {norte}). El modelo no se entrenó ahí.')
+
+
+def asegurar_ee():
+    if not EE['listo']:
+        iniciar_ee()
+        if not EE['listo']:
+            raise HTTPException(503, EE['error'] or 'Earth Engine no está disponible.')
+
+
+@app.get('/cobertura')
+def ver_cobertura(request: Request,
+                  lat: float = Query(..., description='Latitud del centro del lote (grados)'),
+                  lon: float = Query(..., description='Longitud del centro del lote (grados)'),
+                  campana: str = Query(..., description='Campaña, por ejemplo 2025_26')):
+    # Para probar el filtro desde el navegador: muestra qué ve Dynamic World y qué decidiría, sin bajar la serie.
+    validar(lat, lon, campana)
+    asegurar_ee()
+    controlar_limite(ip_de(request))
+    x0, y0 = grilla(lon, lat)
+    with _simultaneos:
+        prob, es_lote, motivo, pct = revisar_cobertura(campana, x0, y0)
+    return {'campana': campana, 'lat': lat, 'lon': lon, 'filtro_activo': filtro_activo(),
+            'es_lote': es_lote, 'pct_no_agricola': pct, 'motivo': motivo,
+            'mensaje': None if es_lote else mensaje_no_lote(campana, motivo, pct),
+            'probabilidades': None if prob is None else {k: round(v, 3) for k, v in prob.items()}}
 
 
 @app.get('/serie')
@@ -230,25 +288,22 @@ def serie(request: Request,
           lat: float = Query(..., description='Latitud del centro del lote (grados)'),
           lon: float = Query(..., description='Longitud del centro del lote (grados)'),
           campana: str = Query(..., description='Campaña, por ejemplo 2025_26')):
-    if campana not in CAMPANAS:
-        raise HTTPException(422, f'Campaña desconocida: {campana}. Opciones: {", ".join(CAMPANAS)}.')
-    oeste, sur, este, norte = REGION_LIMITES
-    if not (oeste <= lon <= este and sur <= lat <= norte):
-        raise HTTPException(422, 'El punto está fuera de la zona del trabajo (núcleo pampeano: '
-                                 f'longitud {oeste} a {este}, latitud {sur} a {norte}). El modelo no se entrenó ahí.')
+    validar(lat, lon, campana)
     x0, y0 = grilla(lon, lat)
     clave = (campana, x0, y0)
     with _cache_lock:
         if clave in _cache:
             _cache.move_to_end(clave)
             return {**_cache[clave], 'en_cache': True}
-    if not EE['listo']:
-        iniciar_ee()
-        if not EE['listo']:
-            raise HTTPException(503, EE['error'] or 'Earth Engine no está disponible.')
+    asegurar_ee()
     controlar_limite(ip_de(request))
     t0 = time.time()
+    prob = None
     with _simultaneos:
+        if filtro_activo():
+            prob, es_lote, motivo, pct = revisar_cobertura(campana, x0, y0)
+            if not es_lote:
+                raise HTTPException(422, mensaje_no_lote(campana, motivo, pct))
         try:
             crudo = bajar_crudo(campana, x0, y0)
         except RuntimeError as e:
@@ -266,6 +321,7 @@ def serie(request: Request,
         'pixeles_sin_dato': int(sin_dato.sum()),
         'esquinas': esquinas(x0, y0),
         'departamento': depto, 'provincia': prov,
+        'cobertura': None if prob is None else {k: round(v, 3) for k, v in prob.items()},
         'segundos': round(time.time() - t0, 1),
     }
     with _cache_lock:
