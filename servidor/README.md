@@ -17,8 +17,12 @@ parche durante la campaña: si más de la mitad es construido, agua, árboles o 
 la página muestra tal cual, y no clasifica. Pasto, suelo desnudo o arbustos no se rechazan (un barbecho o una pastura
 pueden verse así). Si Dynamic World falla, el pedido sigue como antes. Se apaga con la variable `FILTRO_COBERTURA=0`.
 
-Solo acepta puntos de la zona del trabajo (longitud −63,6 a −59,5, latitud −34,3 a −31,4) y las campañas 2019/20 a
-2025/26. Guarda en memoria los últimos 300 parches y limita los pedidos nuevos por conexión.
+Acepta cualquier punto de Argentina (rectángulo aproximado: longitud −73,6 a −53,6, latitud −55,1 a −21,7) y las
+campañas 2019/20 a 2025/26. Fuera de la zona del trabajo (longitud −63,6 a −59,5, latitud −34,3 a −31,4) la serie se
+arma igual, pero la respuesta trae `fuera_de_zona: true` y la página avisa que ahí el modelo no se entrenó ni se evaluó
+(y no muestra el rinde). El rectángulo de Argentina también abarca partes de los países vecinos: por eso, fuera de la zona del trabajo, el servidor confirma el país con FAO GAUL (la misma fuente de límites que usa el 02) antes de bajar las imágenes, y aprovecha esa consulta para el departamento. Si el punto cae en otro país o en el agua responde `422`; si GAUL no responde, queda solo el control del rectángulo para no frenar la demo. Dentro de la zona no se consulta. Fuera del rectángulo también responde `422`: las 27 fechas van de septiembre a mayo, el verano del
+hemisferio sur. Para todos los puntos el parche se arma en UTM 20S, como en el 02; lejos de su meridiano central se
+deforma muy poco (menos del 2 % de tamaño y unos grados de giro, que no importan en un parche homogéneo). Guarda en memoria los últimos 300 parches y limita los pedidos nuevos por conexión.
 
 ## Correrlo
 

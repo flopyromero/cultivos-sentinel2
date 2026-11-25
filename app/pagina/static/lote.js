@@ -5,7 +5,8 @@
 // leerJson, cacheado y bloqueProbs de app.js.
 (function () {
   const SERVIDOR = (window.SERVIDOR_LOTES || '').replace(/\/+$/, '');
-  const REGION = { oeste: -63.6, sur: -34.3, este: -59.5, norte: -31.4 };
+  const REGION = { oeste: -63.6, sur: -34.3, este: -59.5, norte: -31.4 };     // donde se entrenó y evaluó el modelo
+  const PERMITIDO = { oeste: -73.6, sur: -55.1, este: -53.6, norte: -21.7 };  // Argentina (rectángulo aproximado)
   const CAMPANAS_TRABAJO = ['2019_20', '2020_21', '2021_22', '2022_23', '2023_24', '2024_25'];
   const CAMPANAS = [...CAMPANAS_TRABAJO, '2025_26'];
   const T = 27, PATCH = 16, NB = 10, I_B4 = 2, I_B8 = 6;
@@ -27,7 +28,13 @@
   m.attributionControl.addAttribution('Búsqueda &copy; OpenStreetMap');
   document.querySelector('[data-pestana="lote"]').addEventListener('click', () => setTimeout(() => m.invalidateSize(), 0));
 
-  const dentro = (lat, lon) => lon >= REGION.oeste && lon <= REGION.este && lat >= REGION.sur && lat <= REGION.norte;
+  const dentroDe = (z, lat, lon) => lon >= z.oeste && lon <= z.este && lat >= z.sur && lat <= z.norte;
+  const dentro = (lat, lon) => dentroDe(REGION, lat, lon);
+  // Aviso fuera de la zona: texto fijo (sin datos del usuario), por eso va como HTML y no pasa por esc()
+  const AVISO_FUERA = `<p class="nota"><span class="chip-dudoso">Fuera de la zona</span> Este lote está fuera del recuadro
+    amarillo, donde se entrenó el modelo. La red responde igual, pero el resultado puede fallar: acá el calendario de siembra
+    puede ser otro (y si se siembra más tarde, la versión de enero todavía no lo ve), puede haber cultivos que casi no aparecen
+    en la zona núcleo, y cambian el clima y los suelos.</p>`;
 
   // Cuadrado aproximado de 160 m mientras no llega el exacto del servidor (grilla UTM de 10 m)
   function cuadradoAprox(lat, lon) {
@@ -36,8 +43,9 @@
   }
 
   function elegir(lat, lon, centrar) {
-    if (!dentro(lat, lon)) {
-      mostrarError('Ese punto está fuera de la zona del trabajo (el recuadro amarillo). El modelo solo se entrenó en el núcleo pampeano.');
+    if (!dentroDe(PERMITIDO, lat, lon)) {
+      mostrarError('Ese punto está fuera de Argentina. Las imágenes van de septiembre a mayo, el verano del hemisferio sur, '
+        + 'así que el modelo solo tiene sentido en Argentina.');
       return;
     }
     punto = { lat, lon };
@@ -50,7 +58,11 @@
     boton.disabled = !SERVIDOR;
     ins.className = 'inspector';
     ins.innerHTML = `<p class="ayuda">Punto elegido: ${lat.toFixed(5)}, ${lon.toFixed(5)}. Revisá que el cuadrado blanco quede
-      todo adentro de un lote y tocá <strong>Analizar este lote</strong>.</p><p class="nota" id="estado-servidor"></p>`;
+      todo adentro de un lote y tocá <strong>Analizar este lote</strong>.</p>
+      ${dentro(lat, lon) ? '' : '<p class="nota"><span class="chip-dudoso">Fuera de la zona</span> Está fuera del recuadro amarillo, '
+        + 'donde se entrenó el modelo: la red va a responder, pero el resultado no está verificado y puede fallar por un calendario '
+        + 'de siembra distinto o cultivos que no conoce. Al analizarlo se explica en detalle.</p>'}
+      <p class="nota" id="estado-servidor"></p>`;
     mostrarEstadoServidor();
   }
   m.on('click', (e) => elegir(e.latlng.lat, e.latlng.lng, false));
@@ -68,8 +80,7 @@
       return;
     }
     try {
-      const url = 'https://nominatim.openstreetmap.org/search?format=jsonv2&countrycodes=ar&limit=1&accept-language=es&q=' + encodeURIComponent(q)
-        + `&viewbox=${REGION.oeste},${REGION.norte},${REGION.este},${REGION.sur}`;
+      const url = 'https://nominatim.openstreetmap.org/search?format=jsonv2&countrycodes=ar&limit=1&accept-language=es&q=' + encodeURIComponent(q);
       const r = await (await fetch(url)).json();
       if (!r.length) throw new Error(`No encontré “${q}”.`);
       m.setView([Number(r[0].lat), Number(r[0].lon)], 13);
@@ -187,7 +198,7 @@
       ${tip}
       <polyline points="${linea(ndvi)}" fill="none" stroke="#1f2a24" stroke-width="2.4"/>
       ${ley}
-      <text x="${mg.i}" y="${H - 22}">— este lote   - - típica de cada cultivo (promedio de la zona)</text>
+      <text x="${mg.i}" y="${H - 22}">— este lote   - - típica de cada cultivo (promedio de la zona núcleo)</text>
     </svg>`;
   }
 
@@ -222,6 +233,7 @@
       const usar = CAMPANAS_TRABAJO.includes(c) ? c : null;
       const [r, tip] = await Promise.all([M.predecir(bandas, usar), tipicasDe(c).catch(() => ({}))]);
       const ndvi = ndviPorPeriodo(bandas);
+      const fuera = s.fuera_de_zona ?? !dentro(p.lat, p.lon);
       const avisos = [];
       if (Math.max(...ndvi) < 0.45) {
         avisos.push('La curva de verdor es muy baja toda la campaña: el punto puede no ser un lote de cultivo (pueblo, camino, '
@@ -236,17 +248,18 @@
       ins.innerHTML = `
         <h2>Lote elegido · ${camp(c)}</h2>
         <p class="sub">${lugar}${p.lat.toFixed(5)}, ${p.lon.toFixed(5)}</p>
+        ${fuera ? AVISO_FUERA : ''}
         ${avisos.map((a) => `<p class="nota"><span class="chip-dudoso">Ojo</span> ${esc(a)}</p>`).join('')}
         <h3>Verdor (NDVI) a lo largo de la campaña</h3>
         ${grafico(ndvi, tip)}
-        <p class="nota">La línea negra es este lote; las punteadas, la curva típica de cada cultivo en la zona. El lote se parece
-          al cultivo cuya curva sigue. ${fmt(s.pct_interpolado, 1)} % de la serie se completó por nubes.</p>
+        <p class="nota">La línea negra es este lote; las punteadas, la curva típica de cada cultivo en la zona núcleo. El lote se parece
+          al cultivo cuya curva sigue${fuera ? ' (fuera de la zona, las fechas de siembra pueden correr la curva)' : ''}. ${fmt(s.pct_interpolado, 1)} % de la serie se completó por nubes.</p>
         <h3>Qué dijo la red</h3>
         <p class="sub">Con ${modelo}. <strong>En enero</strong> es el pronóstico temprano, con las imágenes hasta fin de enero;
           <strong>con la campaña completa</strong> es la confirmación, con todas las imágenes hasta mayo.</p>
         ${bloqueProbs('En enero', r.enero, null)}
         ${bloqueProbs('Con la campaña completa', r.completa, null)}
-        ${r.enero.rinde_kg_ha === null && r.completa.rinde_kg_ha === null ? '' : `<details class="plegable"><summary>Rinde estimado</summary>
+        ${fuera || (r.enero.rinde_kg_ha === null && r.completa.rinde_kg_ha === null) ? '' : `<details class="plegable"><summary>Rinde estimado</summary>
           <table><tr><th>Rinde estimado del departamento (kg/ha)</th><th class="num"></th></tr>${rinde(r.enero)}${rinde(r.completa)}</table>
           <p class="nota">Es el rinde medio del departamento para ese cultivo, no el de este lote. Con campañas nuevas, la red no le
             ganó al promedio histórico del departamento.</p></details>`}

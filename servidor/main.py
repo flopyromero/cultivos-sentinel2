@@ -31,7 +31,14 @@ from pyproj import Transformer
 import cobertura
 
 # ------------------------------------------------------------------ constantes del notebook 02 (no cambiar)
-REGION_LIMITES = (-63.6, -34.3, -59.5, -31.4)          # oeste, sur, este, norte: la zona del trabajo
+REGION_LIMITES = (-63.6, -34.3, -59.5, -31.4)          # oeste, sur, este, norte: la zona donde se entrenó y evaluó
+# Se acepta cualquier punto de Argentina (rectángulo aproximado del país). Fuera de REGION_LIMITES la red responde igual,
+# pero no se entrenó ni se evaluó ahí: la respuesta lo marca con 'fuera_de_zona' y la página lo avisa.
+# No se acepta el resto del mundo: las 27 fechas van de septiembre a mayo, que es el verano del hemisferio sur.
+PERMITIDO = (-73.6, -55.1, -53.6, -21.7)               # oeste, sur, este, norte
+# El rectángulo incluye partes de Chile, Uruguay, Paraguay, Bolivia y Brasil. Fuera de la zona del trabajo, el país se
+# confirma con FAO GAUL (la misma fuente de límites que usa el 02 para los departamentos): ver controlar_pais().
+PAISES_ACEPTADOS = {'Argentina'}                        # ADM0_NAME en FAO GAUL 2015
 PATCH = 16                                               # 16 x 16 píxeles de 10 m = 160 m
 BANDAS = ['B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B8', 'B8A', 'B11', 'B12']
 CS_UMBRAL = 0.6                                          # Cloud Score+: se descarta todo píxel con puntaje menor
@@ -117,10 +124,23 @@ def iniciar_ee():
         EE['error'] = f'No se pudo conectar con Earth Engine ({type(e).__name__}). Revisar la clave y los permisos de la cuenta de servicio.'
 
 
-def stack_campana(inicio):
-    # Igual al notebook 02
+def parche_ee(x0, y0):
     import ee
-    region = ee.Geometry.Rectangle(list(REGION_LIMITES))
+    lado = PATCH * 10
+    return ee.Geometry.Rectangle([x0, y0 - lado, x0 + lado, y0], 'EPSG:32720', False)
+
+
+def dentro_de(limites, lat, lon):
+    oeste, sur, este, norte = limites
+    return oeste <= lon <= este and sur <= lat <= norte
+
+
+def stack_campana(inicio, zona):
+    # Igual al notebook 02. La única diferencia es filterBounds: el 02 filtraba por la zona del trabajo y acá se filtra
+    # por el parche pedido, para que funcione en cualquier lugar. Dentro de la zona la serie es la misma: las imágenes
+    # que no tocan el parche no tienen píxeles ahí y no cambian la mediana.
+    import ee
+    region = zona
     cs_plus = ee.ImageCollection('GOOGLE/CLOUD_SCORE_PLUS/V1/S2_HARMONIZED')
     per = periodos(inicio)
     s2 = (ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')
@@ -142,7 +162,7 @@ def stack_campana(inicio):
 def bajar_crudo(campana, x0, y0, intentos=4):
     # Igual a bajar_parche() del 02, pero con la grilla ya calculada. Devuelve (T, H, W, C) uint16 con 0 donde no hay dato.
     import ee
-    pedido = {'expression': stack_campana(inicio_de(campana)), 'fileFormat': 'NUMPY_NDARRAY',
+    pedido = {'expression': stack_campana(inicio_de(campana), parche_ee(x0, y0)), 'fileFormat': 'NUMPY_NDARRAY',
               'grid': {'dimensions': {'width': PATCH, 'height': PATCH},
                        'affineTransform': {'scaleX': 10, 'shearX': 0, 'translateX': x0,
                                            'shearY': 0, 'scaleY': -10, 'translateY': y0},
@@ -160,14 +180,21 @@ def bajar_crudo(campana, x0, y0, intentos=4):
     raise RuntimeError(f'Earth Engine no respondió: {type(ultimo).__name__}: {str(ultimo)[:200]}')
 
 
+def ubicacion_de(lon, lat):
+    # (departamento, provincia, país) según FAO GAUL, como en el 02. Si el punto no cae en ningún país (mar o un río
+    # ancho), los tres son None. Si Earth Engine falla, la excepción sigue: quien llama decide qué hacer.
+    import ee
+    gaul = ee.FeatureCollection('FAO/GAUL/2015/level2').filterBounds(ee.Geometry.Point([lon, lat]))
+    f = gaul.first().getInfo()
+    p = f['properties'] if f else {}
+    return p.get('ADM2_NAME'), p.get('ADM1_NAME'), p.get('ADM0_NAME')
+
+
 def departamento_de(lon, lat):
-    # Opcional: nombre del departamento (FAO GAUL, como en el 02). Si falla, la serie igual se devuelve.
+    # Opcional: nombre del departamento. Si falla, la serie igual se devuelve.
     try:
-        import ee
-        gaul = ee.FeatureCollection('FAO/GAUL/2015/level2').filterBounds(ee.Geometry.Point([lon, lat]))
-        f = gaul.first().getInfo()
-        p = f['properties'] if f else {}
-        return p.get('ADM2_NAME'), p.get('ADM1_NAME')
+        depto, prov, _ = ubicacion_de(lon, lat)
+        return depto, prov
     except Exception:
         return None, None
 
@@ -246,16 +273,32 @@ def controlar_limite(ip):
 @app.get('/salud')
 def salud(request: Request):
     return {'ok': True, 'tu_ip': ip_de(request), 'earth_engine': EE['listo'], 'error': EE['error'], 'campanas': CAMPANAS,
-            'region': dict(zip(['oeste', 'sur', 'este', 'norte'], REGION_LIMITES)), 'filtro_cobertura': filtro_activo()}
+            'region': dict(zip(['oeste', 'sur', 'este', 'norte'], REGION_LIMITES)),
+            'permitido': dict(zip(['oeste', 'sur', 'este', 'norte'], PERMITIDO)), 'filtro_cobertura': filtro_activo()}
 
 
 def validar(lat, lon, campana):
     if campana not in CAMPANAS:
         raise HTTPException(422, f'Campaña desconocida: {campana}. Opciones: {", ".join(CAMPANAS)}.')
-    oeste, sur, este, norte = REGION_LIMITES
-    if not (oeste <= lon <= este and sur <= lat <= norte):
-        raise HTTPException(422, 'El punto está fuera de la zona del trabajo (núcleo pampeano: '
-                                 f'longitud {oeste} a {este}, latitud {sur} a {norte}). El modelo no se entrenó ahí.')
+    if not dentro_de(PERMITIDO, lat, lon):
+        raise HTTPException(422, 'El punto está fuera de Argentina. La serie va de septiembre a mayo, el verano del '
+                                 'hemisferio sur, así que el modelo solo tiene sentido en Argentina.')
+
+
+def controlar_pais(lat, lon):
+    # Fuera de la zona del trabajo, confirma con FAO GAUL que el punto está en Argentina (el rectángulo PERMITIDO
+    # también abarca países vecinos). Devuelve (departamento, provincia) para no repetir la consulta, o None si GAUL
+    # no respondió: en ese caso queda solo el control del rectángulo, para que una falla de Earth Engine no frene la demo.
+    # Dentro de la zona no se llama: ahí todo es Argentina.
+    try:
+        depto, prov, pais = ubicacion_de(lon, lat)
+    except Exception:
+        return None
+    if pais not in PAISES_ACEPTADOS:
+        donde = f'en {pais}' if pais else 'en el agua (mar o río), fuera de cualquier lote'
+        raise HTTPException(422, f'Ese punto está {donde}. La página solo analiza lotes de Argentina: las 27 fechas van '
+                                 'de septiembre a mayo y el modelo se armó con datos argentinos.')
+    return depto, prov
 
 
 def asegurar_ee():
@@ -276,9 +319,11 @@ def ver_cobertura(request: Request,
     controlar_limite(ip_de(request))
     x0, y0 = grilla(lon, lat)
     with _simultaneos:
+        if not dentro_de(REGION_LIMITES, lat, lon):
+            controlar_pais(lat, lon)
         prob, es_lote, motivo, pct = revisar_cobertura(campana, x0, y0)
     return {'campana': campana, 'lat': lat, 'lon': lon, 'filtro_activo': filtro_activo(),
-            'es_lote': es_lote, 'pct_no_agricola': pct, 'motivo': motivo,
+            'fuera_de_zona': not dentro_de(REGION_LIMITES, lat, lon), 'es_lote': es_lote, 'pct_no_agricola': pct, 'motivo': motivo,
             'mensaje': None if es_lote else mensaje_no_lote(campana, motivo, pct),
             'probabilidades': None if prob is None else {k: round(v, 3) for k, v in prob.items()}}
 
@@ -300,6 +345,8 @@ def serie(request: Request,
     t0 = time.time()
     prob = None
     with _simultaneos:
+        # el país se controla primero: si el punto no es de Argentina, no se baja nada
+        ubicacion = None if dentro_de(REGION_LIMITES, lat, lon) else controlar_pais(lat, lon)
         if filtro_activo():
             prob, es_lote, motivo, pct = revisar_cobertura(campana, x0, y0)
             if not es_lote:
@@ -308,12 +355,13 @@ def serie(request: Request,
             crudo = bajar_crudo(campana, x0, y0)
         except RuntimeError as e:
             raise HTTPException(502, str(e))
-        depto, prov = departamento_de(lon, lat)
+        depto, prov = ubicacion if ubicacion else departamento_de(lon, lat)
     relleno = (crudo == 0).all(axis=-1).mean(axis=(1, 2))                    # fracción de píxeles sin dato por período
     X, sin_dato = interpolar(crudo[None])
     X = X[0]
     res = {
         'campana': campana, 'lat': lat, 'lon': lon,
+        'fuera_de_zona': not dentro_de(REGION_LIMITES, lat, lon),     # fuera de donde se entrenó y evaluó el modelo
         'forma': list(X.shape), 'dtype': 'uint16',
         'bandas_b64': base64.b64encode(X.astype('<u2').tobytes()).decode(),   # (T, H, W, C), little-endian
         'relleno_por_periodo': [round(float(v), 4) for v in relleno],
